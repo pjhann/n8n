@@ -1,0 +1,80 @@
+networks:
+  n8n_net:
+    name: n8n_net
+    driver: bridge
+
+volumes:
+  n8n_data:
+  postgres_data:
+
+services:
+  postgres:
+    image: "postgres:16-alpine"
+    container_name: "n8n-postgres"
+    environment:
+      POSTGRES_USER: "n8n"
+      POSTGRES_PASSWORD: "supersecret"
+      POSTGRES_DB: "n8n"
+    volumes:
+      - "postgres_data:/var/lib/postgresql/data"
+    restart: "unless-stopped"
+    networks:
+      - n8n_net
+
+  n8n:
+    image: "n8nio/n8n:latest"
+    container_name: "n8n"
+    depends_on:
+      - "postgres"
+    environment:
+      # --- Base ---
+      N8N_PORT: "5678"
+      N8N_HOST: "0.0.0.0"
+      WEBHOOK_URL: "http://localhost:5678"
+      N8N_GENERIC_TIMEZONE: "Europe/Helsinki"
+      TZ: "Europe/Helsinki"
+
+      # --- Database (uses hostname 'postgres' on the same network) ---
+      DB_TYPE: "postgresdb"
+      DB_POSTGRESDB_HOST: "postgres"
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: "n8n"
+      DB_POSTGRESDB_USER: "n8n"
+      DB_POSTGRESDB_PASSWORD: "supersecret"
+
+      # --- External runners (recommended in n8n v2) ---
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_RUNNERS_MODE: "external"
+      N8N_RUNNERS_BROKER_LISTEN_ADDRESS: "0.0.0.0"
+      N8N_RUNNERS_AUTH_TOKEN: "${RUNNERS_TOKEN}"
+
+      # --- Python Native (runner provides the venv) ---
+      N8N_NATIVE_PYTHON_RUNNER: "true"
+      N8N_PYTHON_VENV: "/opt/n8n-python-venv"
+
+      # --- Disable internal Python runner to avoid warnings ---
+      N8N_PYTHON_ENABLED: "true"
+
+    ports:
+      - "8091:5678"
+    volumes:
+      - "n8n_data:/home/node/.n8n"
+    restart: "unless-stopped"
+    networks:
+      - n8n_net
+
+  task-runners:
+    # Build our Python-enabled runner locally (see Dockerfile below)
+    build:
+      context: "./runner"
+      dockerfile: "Dockerfile"
+    image: "n8nio/runners:latest"
+    container_name: "n8n_runners"
+    environment:
+      N8N_RUNNERS_TASK_BROKER_URI: "http://n8n:5679"   # 'n8n' resolves on n8n_net
+      N8N_RUNNERS_AUTH_TOKEN: "${RUNNERS_TOKEN}"
+    depends_on:
+      - "n8n"
+    restart: "unless-stopped"
+    networks:
+      - n8n_net
