@@ -71,7 +71,7 @@ services:
     networks:
       - n8n-network
 networks:
-  n8n_net:
+  n8n-network:
     name: n8n-network
     external: true    
 volumes:
