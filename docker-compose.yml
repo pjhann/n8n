@@ -22,7 +22,7 @@ services:
       # ---- Server binding / protocol ----
       N8N_HOST: ${N8N_HOST}
       N8N_LISTEN_ADDRESS: ${N8N_LISTEN_ADDRESS}
-      N8N_PORT: "5678"
+      N8N_PORT: ${N8N_PORT}
       N8N_PROTOCOL: "http"
       N8N_DISABLE_UI: "false"
 
