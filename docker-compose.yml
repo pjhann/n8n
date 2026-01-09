@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
     volumes:
       - "postgres_data:/var/lib/postgresql/data"
     restart: unless-stopped
@@ -14,63 +14,48 @@ services:
       - n8n-network
 
   n8n:
-    image: "n8nio/n8n:1.123.11"  # Pin a version for stability; upgrade intentionally.
+    image: "n8nio/n8n:1.123.11"
     container_name: "n8n"
     depends_on:
       - postgres
     environment:
-      # ---- Server binding / protocol ----
+      # ---- Bindings ----
       N8N_HOST: ${N8N_HOST}
       N8N_LISTEN_ADDRESS: ${N8N_LISTEN_ADDRESS}
       N8N_PORT: ${N8N_PORT}
-      N8N_PROTOCOL: "http"
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
       N8N_DISABLE_UI: "false"
 
       # ---- Timezone ----
       N8N_GENERIC_TIMEZONE: "Europe/Helsinki"
       TZ: "Europe/Helsinki"
 
-      # ---- Database (Postgres on same Docker network) ----
+      # ---- Database ----
       DB_TYPE: "postgresdb"
       DB_POSTGRESDB_HOST: "postgres"
       DB_POSTGRESDB_PORT: "5432"
-      DB_POSTGRESDB_DATABASE: "${POSTGRES_DB}"
+      DB_POSTGRESDB_DATABASE: "${POSTGRES_DATABASE}"
       DB_POSTGRESDB_USER: "${POSTGRES_USER}"
       DB_POSTGRESDB_PASSWORD: "${POSTGRES_PASSWORD}"
 
-      # ---- Python (internal/native runner) ----
+      # ---- Python (Internal runner) ----
       N8N_PYTHON_ENABLED: "true"
       N8N_NATIVE_PYTHON_RUNNER: "true"
 
-      # ============================
-      # NGINX Proxy Manager (NPM) / Reverse proxy settings (COMMENTED)
-      # ============================
-      # When you put n8n behind NPM with your domain (e.g., https://n8n.wesentra.com),
-      # uncomment N8N_PUBLIC_URL and (optionally) WEBHOOK_URL.
-      #
-      # IMPORTANT:
-      # - In NPM, configure a Proxy Host:
-      #     Domain: n8n.wesentra.com
-      #     Scheme: http
-      #     Forward Hostname / IP: n8n        (the service name on the same Docker network)
-      #     Forward Port: 5678
-      #   Enable: "Block Common Exploits" + "Websockets Support"
-      #
-      # - Do NOT add :5678 in the public URL when using HTTPS via the proxy.
-      #
-      # N8N_PUBLIC_URL: "https://n8n.wesentra.com"
-      # WEBHOOK_URL: "https://n8n.wesentra.com"
-      #
-      # If you use a different base path or subfolder behind NPM (rare), you may also set:
+      # ---- Reverse proxy (NPM) ----
+      # Public-facing HTTPS URL of your instance (via NPM)
+      N8N_PUBLIC_URL: "https://n8n.wesentra.com"
+
+      # Only needed if you plan to receive external webhooks:
+      WEBHOOK_URL: "https://n8n.wesentra.com"
+
+      # If using a special editor path behind NPM, uncomment:
       # N8N_EDITOR_BASE_URL: "https://n8n.wesentra.com"
-      # ============================
-
-    # ===== Ports: choose ONE option =====
-    ports:
-      - "5678:5678"   # Option A: expose for direct access at http://localhost:5678
-    # Option B (NPM-only): comment out the line above to avoid exposing a host port,
-    # and let NPM be the only public entry point.
-
+    
+    # NOTE: No host port exposed. NPM handles public access.
+    # ports:
+    #   - "5678:5678"
+    
     volumes:
       - "n8n_data:/home/node/.n8n"
     restart: unless-stopped
@@ -79,7 +64,6 @@ services:
 
 networks:
   n8n-network:
-    name: n8n-network
     external: true
 
 volumes:
